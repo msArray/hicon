@@ -1,2 +1,3 @@
-# hicon
-icon generate api
+```
+deno task start
+```
