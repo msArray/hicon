@@ -3,10 +3,11 @@
     "color": "npm:color@^5.0.0",
     "hono": "jsr:@hono/hono@^4.9.6",
     "roughjs": "npm:roughjs@^4.6.6",
+    "sharp": "npm:sharp@^0.34.3",
     "xmldom": "npm:xmldom@^0.6.0"
   },
   "tasks": {
-    "start": "deno run --allow-net main.ts"
+    "start": "deno run --allow-net ./src/index.ts"
   },
   "compilerOptions": {
     "jsx": "precompile",
