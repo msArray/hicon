@@ -1,9 +1,13 @@
 {
   "imports": {
+    "@svgdotjs/svg.js": "npm:@svgdotjs/svg.js@^3.2.4",
+    "@svgdotjs/svg.resize.js": "npm:@svgdotjs/svg.resize.js@^2.0.5",
     "color": "npm:color@^5.0.0",
     "hono": "jsr:@hono/hono@^4.9.6",
+    "path-data-parser": "npm:path-data-parser@^0.1.0",
     "roughjs": "npm:roughjs@^4.6.6",
     "sharp": "npm:sharp@^0.34.3",
+    "svgdom": "npm:svgdom@^0.1.22",
     "xmldom": "npm:xmldom@^0.6.0"
   },
   "tasks": {

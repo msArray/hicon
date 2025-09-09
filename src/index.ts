@@ -1,73 +1,80 @@
-import { Hono } from "hono";
-import Color from "color";
-import { DOMImplementation, XMLSerializer } from "xmldom";
-import rough from "roughjs";
-import sharp from "sharp";
 import { Buffer } from "node:buffer";
+import { Hono } from "hono";
+import { serveStatic } from "hono/deno";
+import Color from "color";
+import rough from "roughjs";
+import { RoughSVG } from "roughjs/bin/svg.d.ts";
+import sharp from "sharp";
+import { createSVGWindow } from "svgdom";
+import { registerWindow, SVG } from "@svgdotjs/svg.js";
+import "@svgdotjs/svg.resize.js";
+
+import { resizePathData } from "./pathResize.ts";
 
 const {
   createHash,
 } = await import("node:crypto");
 
+const window = createSVGWindow();
+const document = window.document;
+registerWindow(window, document);
+
 const app = new Hono();
+app.use("/public/*", serveStatic({ root: "./public" }));
+app.use(
+  "/favicon.ico",
+  serveStatic({ root: "./public", path: "./favicon.ico" }),
+);
 
 app.get("/api/person/:id", async (c) => {
   const id = c.req.param("id");
   const hash = createHash("sha256").update(id).digest("hex");
   const { deg, size, format } = c.req.query();
+  if (deg && isNaN(parseInt(deg))) {
+    return c.text("400 Bad Request: deg must be a number", 400);
+  }
+  if (
+    size &&
+    (isNaN(parseInt(size)) || parseInt(size) < 1 || parseInt(size) > 1024)
+  ) {
+    return c.text(
+      "400 Bad Request: size must be a number between 1 and 1024",
+      400,
+    );
+  }
   const degree = deg ? parseInt(deg) : parseInt(hash.slice(0, 2), 16);
-  const ratio = size ? parseInt(size) / 500 : 1;
+  const ratio = size ? (Math.min(parseInt(size, 10), 1024) / 500) : 1;
   const color = Color({ h: degree, s: 46, l: 76 });
-  const doc = new DOMImplementation().createDocument(null, null);
-  const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewbox", `0 0 ${500 * ratio} ${500 * ratio}`);
-  svg.setAttribute("width", `${500 * ratio}`);
-  svg.setAttribute("height", `${500 * ratio}`);
-  svg.setAttribute("height", `${500 * ratio}`);
-  const rc = (rough as any).svg(svg);
+  const svg = SVG().size(500 * ratio, 500 * ratio);
+  const rc = rough.svg(svg.node) as unknown as RoughSVG;
 
   const bg = rc.rectangle(0, 0, 500 * ratio, 500 * ratio, {
     fill: color.lighten(0.2).hex(),
-    fillWeight: 2 * ratio,
-    hachureGap: 8 * ratio,
+    fillWeight: 2,
+    hachureGap: 8,
     strokeWidth: 0,
   });
 
   const person = rc.path(
-    "M0 500 500 500C500 400 450 300 350 300a150 150 90 10 0 -200 0C50 300 0 400 0 500Z",
+    resizePathData(
+      "M0 500 500 500C500 400 450 300 350 300a150 150 90 10 0 -200 0C50 300 0 400 0 500Z",
+      ratio,
+    ),
     {
       fill: color.hex(),
-      fillWeight: 3 * ratio,
+      fillWeight: 3,
       hachureAngle: 60,
-      hachureGap: 8 * ratio,
+      hachureGap: 8,
       stroke: color.darken(0.4).hex(),
     },
   );
-  /*
-    const body = rc.circle(250 * ratio, 500 * ratio, 400 * ratio, {
-        fill: color.hex(),
-        fillWeight: 3 * ratio,
-        hachureAngle: 60,
-        hachureGap: 8 * ratio,
-        stroke: color.darken(0.4).hex(),
-    });
-
-    const head = rc.circle(250 * ratio, 250 * ratio, 200 * ratio, {
-        fill: color.hex(),
-        hachureAngle: 60,
-        hachureGap: 8 * ratio,
-        fillWeight: 3 * ratio,
-        stroke: color.darken(0.4).hex(),
-    });
-    */
-  svg.appendChild(bg);
-  // svg.appendChild(body);
-  // svg.appendChild(head);
-  svg.appendChild(person);
-  const xml = new XMLSerializer().serializeToString(svg);
+  svg.node.appendChild(bg);
+  svg.node.appendChild(person);
+  const xml = svg.svg();
+  const sharpSvg = sharp(Buffer.from(xml));
   if (format === "png") {
     try {
-      const pngBuffer = await sharp(Buffer.from(xml)).png().toBuffer();
+      const pngBuffer = await sharpSvg.png().toBuffer();
       return c.body(new Uint8Array(pngBuffer), 200, {
         "Content-Type": "image/png",
       });
@@ -79,7 +86,7 @@ app.get("/api/person/:id", async (c) => {
 
   if (format === "jpeg" || format === "jpg") {
     try {
-      const jpgBuffer = await sharp(Buffer.from(xml)).jpeg().toBuffer();
+      const jpgBuffer = await sharpSvg.jpeg().toBuffer();
       return c.body(new Uint8Array(jpgBuffer), 200, {
         "Content-Type": "image/jpeg",
       });
@@ -91,7 +98,7 @@ app.get("/api/person/:id", async (c) => {
 
   if (format === "webp") {
     try {
-      const webpBuffer = await sharp(Buffer.from(xml)).webp().toBuffer();
+      const webpBuffer = await sharpSvg.webp().toBuffer();
       return c.body(new Uint8Array(webpBuffer), 200, {
         "Content-Type": "image/webp",
       });
